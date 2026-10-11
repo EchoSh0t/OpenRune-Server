@@ -7,6 +7,7 @@ import org.rsmod.events.SuspendEventMap
 import org.rsmod.events.UnboundEventMap
 import org.rsmod.game.GameProcess
 import org.rsmod.game.GameUpdate
+import org.rsmod.game.LoginRestrictions
 import org.rsmod.game.MapClock
 import org.rsmod.game.cheat.CheatCommandMap
 import org.rsmod.game.entity.ControllerList
@@ -24,6 +25,7 @@ object GameModule : ExtendedModule() {
         install(CoreModule)
         install(EventModule)
         bindInstance<GameUpdate>()
+        bindInstance<LoginRestrictions>()
         bindInstance<MapClock>()
         bindInstance<NpcList>()
         bindInstance<PlayerList>()

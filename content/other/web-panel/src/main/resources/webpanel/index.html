@@ -1,0 +1,487 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>OpenRune Panel</title>
+<style>
+  :root {
+    --bg: #1b1712;
+    --panel: #2e2820;
+    --panel-dark: #241f19;
+    --border: #5b4e3c;
+    --border-light: #7a6a52;
+    --orange: #ff981f;
+    --white: #ffffff;
+    --yellow: #ffff00;
+    --red: #ff3030;
+    --green: #00ff00;
+    --grey: #9f9f9f;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--white);
+    font: 13px/1.4 Verdana, Tahoma, sans-serif;
+    text-shadow: 1px 1px 0 #000;
+  }
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 20px;
+    background: var(--panel-dark);
+    border-bottom: 2px solid var(--border);
+  }
+  h1 { margin: 0; font-size: 18px; color: var(--orange); }
+  h2 { margin: 0 0 10px; font-size: 14px; color: var(--orange); }
+  .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; }
+  .online { background: var(--green); }
+  .offline { background: var(--red); }
+  .badge { margin-left: 10px; padding: 2px 8px; border: 1px solid var(--yellow); color: var(--yellow); }
+  main {
+    display: grid;
+    grid-template-columns: 1fr 380px;
+    gap: 16px;
+    padding: 16px 20px;
+  }
+  .stack > * + * { margin-top: 16px; }
+  .box {
+    background: var(--panel);
+    border: 2px solid var(--border);
+    box-shadow: inset 1px 1px 0 var(--border-light), inset -1px -1px 0 #000;
+    padding: 12px;
+  }
+  .stats { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; }
+  .stat .label { color: var(--orange); font-size: 11px; }
+  .stat .value { font-size: 18px; }
+  .warn { color: var(--yellow); }
+  .bad { color: var(--red); }
+  .good { color: var(--green); }
+  .controls { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  table { width: 100%; border-collapse: collapse; }
+  th { text-align: left; color: var(--orange); font-weight: normal; padding: 6px 8px; border-bottom: 1px solid var(--border); }
+  td { padding: 6px 8px; border-bottom: 1px solid #3a3228; }
+  #players tr { cursor: pointer; }
+  #players tr:hover td { color: var(--yellow); }
+  #players tr.selected td { background: #3b3226; color: var(--yellow); }
+  .empty { color: var(--grey); text-align: center; padding: 20px; }
+  .row { display: flex; gap: 8px; margin-bottom: 8px; align-items: center; }
+  input, select {
+    flex: 1;
+    min-width: 0;
+    background: var(--panel-dark);
+    color: var(--white);
+    border: 1px solid var(--border);
+    padding: 6px 8px;
+    font: inherit;
+  }
+  input:focus, select:focus { outline: none; border-color: var(--orange); }
+  button {
+    background: linear-gradient(#5a4c3a, #3c3226);
+    color: var(--orange);
+    border: 1px solid #000;
+    box-shadow: inset 1px 1px 0 var(--border-light);
+    padding: 6px 14px;
+    font: inherit;
+    text-shadow: 1px 1px 0 #000;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  button:hover { color: var(--yellow); }
+  button.danger { color: var(--red); }
+  button.small { padding: 2px 10px; }
+  .skills { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; margin-bottom: 14px; }
+  .skill { background: var(--panel-dark); border: 1px solid #3a3228; padding: 4px 6px; display: flex; justify-content: space-between; }
+  .skill .name { color: var(--orange); text-transform: capitalize; }
+  .boosted { color: var(--green); }
+  .drained { color: var(--red); }
+  .section { margin-top: 14px; }
+  .muted { color: var(--grey); }
+  .note { color: var(--grey); font-size: 11px; margin-top: 4px; }
+  #toast {
+    position: fixed;
+    right: 20px;
+    bottom: 20px;
+    padding: 10px 14px;
+    background: var(--panel-dark);
+    border: 2px solid var(--border);
+    opacity: 0;
+    transition: opacity .2s;
+  }
+  #toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+<header>
+  <h1>OpenRune Panel</h1>
+  <div>
+    <span id="status-dot" class="dot offline"></span><span id="status-text">Connecting…</span>
+    <span id="maintenance-badge" class="badge" hidden>Maintenance</span>
+    <span id="countdown-badge" class="badge" hidden></span>
+  </div>
+</header>
+
+<main>
+  <section class="stack">
+    <div class="stats">
+      <div class="box stat"><div class="label">Uptime</div><div class="value" id="uptime">-</div></div>
+      <div class="box stat"><div class="label">Players online</div><div class="value" id="online">-</div></div>
+      <div class="box stat"><div class="label">Tick (last / avg)</div><div class="value" id="tick">-</div></div>
+      <div class="box stat"><div class="label">Slowest tick</div><div class="value" id="tick-max">-</div></div>
+      <div class="box stat"><div class="label">Memory</div><div class="value" id="heap">-</div></div>
+    </div>
+
+    <div class="controls">
+      <div class="box">
+        <h2>Maintenance mode</h2>
+        <div class="row">
+          <span id="maintenance-state">-</span>
+          <button id="maintenance-toggle" style="margin-left: auto;">Toggle</button>
+        </div>
+        <div class="note">While on, only staff accounts can log in. Players already online stay.</div>
+
+        <h2 class="section">Global XP rate</h2>
+        <form class="row" id="xp-form">
+          <input id="xp-rate" type="number" step="0.1" min="0.1" max="100">
+          <button type="submit">Set</button>
+        </form>
+        <div class="note">Multiplies on top of each player's own rate. Current: <span id="xp-current">-</span></div>
+      </div>
+
+      <div class="box">
+        <h2>Scheduled restart</h2>
+        <form id="schedule-form">
+          <div class="row">
+            <select id="schedule-mode">
+              <option value="restart">Restart</option>
+              <option value="rebuild">Rebuild cache &amp; restart</option>
+              <option value="shutdown">Shut down</option>
+            </select>
+          </div>
+          <div class="row">
+            <input id="schedule-seconds" type="number" min="0" max="3600" value="60">
+            <span class="muted">seconds</span>
+            <button type="submit">Start</button>
+            <button type="button" class="danger" id="schedule-cancel">Cancel</button>
+          </div>
+        </form>
+        <div id="schedule-state" class="muted">No countdown running.</div>
+        <div id="supervised-note" class="note"></div>
+      </div>
+
+      <div class="box">
+        <h2>Broadcast</h2>
+        <form class="row" id="broadcast-form">
+          <input id="broadcast-text" placeholder="Message to every player" maxlength="200">
+          <button type="submit">Send</button>
+        </form>
+      </div>
+    </div>
+
+    <div class="box">
+      <h2>Players</h2>
+      <table>
+        <thead><tr><th>Name</th><th>Combat</th><th>Total</th><th>Position</th><th>Run</th></tr></thead>
+        <tbody id="players"></tbody>
+      </table>
+    </div>
+
+    <div class="box">
+      <h2>Bans</h2>
+      <form class="row" id="ban-form">
+        <input id="ban-name" placeholder="Character name (works offline too)">
+        <select id="ban-days" style="flex: 0 0 140px;">
+          <option value="1">1 day</option>
+          <option value="7">7 days</option>
+          <option value="30">30 days</option>
+          <option value="">Permanent</option>
+        </select>
+        <button type="submit" class="danger">Ban</button>
+      </form>
+      <table>
+        <thead><tr><th>Name</th><th>Banned until</th><th></th></tr></thead>
+        <tbody id="bans"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <aside class="box" id="detail" style="align-self: start;">
+    <h2 id="detail-title">Select a player</h2>
+    <div id="detail-body" class="muted">Click a player in the list to see their skills and admin actions.</div>
+    <div id="detail-actions" hidden>
+      <div class="skills" id="skills"></div>
+
+      <div class="section">
+        <h2>Give item</h2>
+        <form class="row" id="give-form">
+          <input id="give-item" placeholder="Name or id (e.g. bronze axe)">
+          <input id="give-count" type="number" min="1" value="1" style="flex: 0 0 80px;">
+          <button type="submit">Give</button>
+        </form>
+      </div>
+
+      <div class="section">
+        <h2>Teleport</h2>
+        <form class="row" id="tele-form">
+          <input id="tele-x" type="number" placeholder="x" value="3222">
+          <input id="tele-z" type="number" placeholder="z" value="3218">
+          <input id="tele-level" type="number" placeholder="level" value="0" style="flex: 0 0 60px;">
+          <button type="submit">Go</button>
+        </form>
+      </div>
+
+      <div class="section row">
+        <button class="danger" id="kick">Kick</button>
+        <button class="danger" id="ban-selected">Ban…</button>
+      </div>
+    </div>
+  </aside>
+</main>
+
+<div id="toast"></div>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+  let selected = null;
+  let lastPlayers = [];
+  let lastStatus = null;
+  let xpRateTouched = false;
+
+  function formatUptime(seconds) {
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = seconds % 60;
+    return h > 0 ? `${h}h ${m}m` : `${m}m ${s}s`;
+  }
+
+  function tickClass(ms) {
+    if (ms > 600) return 'bad';
+    if (ms > 300) return 'warn';
+    return '';
+  }
+
+  function escapeHtml(text) {
+    return String(text).replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
+  }
+
+  function toast(message, ok) {
+    const el = $('toast');
+    el.textContent = message;
+    el.style.color = ok ? 'var(--green)' : 'var(--red)';
+    el.classList.add('show');
+    clearTimeout(el.timer);
+    el.timer = setTimeout(() => el.classList.remove('show'), 3500);
+  }
+
+  async function action(body, quiet = false) {
+    try {
+      const res = await fetch('/api/action', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Panel': '1' },
+        body: JSON.stringify(body),
+      });
+      const result = await res.json();
+      if (!quiet || !result.ok) toast(result.message, result.ok);
+      return result;
+    } catch (e) {
+      if (!quiet) toast('Could not reach the server.', false);
+      return { ok: false };
+    }
+  }
+
+  function renderPlayers(players) {
+    const body = $('players');
+    if (players.length === 0) {
+      body.innerHTML = '<tr><td colspan="5" class="empty">Nobody is online.</td></tr>';
+      return;
+    }
+    body.innerHTML = players.map((p) => `
+      <tr data-name="${escapeHtml(p.name)}" class="${p.name === selected ? 'selected' : ''}">
+        <td>${escapeHtml(p.name)}</td>
+        <td>${p.combatLevel}</td>
+        <td>${p.totalLevel}</td>
+        <td>${p.x}, ${p.z}, ${p.level}</td>
+        <td>${p.runEnergy}%</td>
+      </tr>`).join('');
+  }
+
+  function renderDetail() {
+    const player = lastPlayers.find((p) => p.name === selected);
+    $('detail-actions').hidden = !player;
+    $('detail-body').hidden = !!player;
+    if (!player) {
+      $('detail-title').textContent = 'Select a player';
+      if (selected) $('detail-body').textContent = `${selected} is no longer online.`;
+      return;
+    }
+    $('detail-title').textContent = `${player.name} (level ${player.combatLevel})`;
+    $('skills').innerHTML = player.skills.map((s) => {
+      const cls = s.level > s.base ? 'boosted' : s.level < s.base ? 'drained' : '';
+      return `<div class="skill"><span class="name">${escapeHtml(s.name)}</span>
+        <span class="${cls}">${s.level}/${s.base}</span></div>`;
+    }).join('');
+  }
+
+  function renderControls(data) {
+    $('maintenance-state').innerHTML = data.maintenance
+      ? '<span class="warn">On</span>' : '<span class="good">Off</span>';
+    $('maintenance-badge').hidden = !data.maintenance;
+    $('xp-current').textContent = `${data.globalXpRate}x`;
+    if (!xpRateTouched) $('xp-rate').value = data.globalXpRate;
+
+    const countdown = data.countdownSeconds;
+    const badge = $('countdown-badge');
+    if (countdown != null) {
+      const label = data.scheduledAction || 'Update';
+      badge.hidden = false;
+      badge.textContent = `${label} in ${countdown}s`;
+      $('schedule-state').innerHTML = `<span class="warn">${escapeHtml(label)} in ${countdown} seconds.</span>`;
+    } else if (data.scheduledAction) {
+      badge.hidden = false;
+      badge.textContent = `${data.scheduledAction}: waiting for players to log out`;
+      $('schedule-state').innerHTML = '<span class="warn">Logging everyone out…</span>';
+    } else {
+      badge.hidden = true;
+      $('schedule-state').textContent = 'No countdown running.';
+    }
+    $('supervised-note').innerHTML = data.supervised
+      ? 'Started with run-server.sh: restarts are available.'
+      : '<span class="warn">Not started with ./run-server.sh, so only "Shut down" is available.</span>';
+  }
+
+  async function loadBans() {
+    const result = await action({ type: 'bans' }, true);
+    if (!result.ok) return;
+    const body = $('bans');
+    if (result.data.length === 0) {
+      body.innerHTML = '<tr><td colspan="3" class="empty">Nobody is banned.</td></tr>';
+      return;
+    }
+    body.innerHTML = result.data.map((b) => `
+      <tr>
+        <td>${escapeHtml(b.name)}</td>
+        <td class="${b.permanent ? 'bad' : ''}">${escapeHtml(b.bannedUntil)}</td>
+        <td style="text-align: right;"><button class="small" data-unban="${escapeHtml(b.name)}">Unban</button></td>
+      </tr>`).join('');
+  }
+
+  async function ban(name, days) {
+    const length = days ? `${days} day(s)` : 'permanently';
+    if (!name || !confirm(`Ban ${name} ${length}? They will be kicked if online.`)) return;
+    const result = await action({ type: 'ban', player: name, days: days ? parseInt(days, 10) : null });
+    if (result.ok) loadBans();
+  }
+
+  async function poll() {
+    try {
+      const res = await fetch('/api/status', { cache: 'no-store' });
+      if (!res.ok) throw new Error(await res.text());
+      const data = await res.json();
+      const wasOffline = lastStatus === null;
+      lastStatus = data;
+      $('status-dot').className = 'dot online';
+      $('status-text').textContent = `Online · tick ${data.cycle}`;
+      $('uptime').textContent = formatUptime(data.uptimeSeconds);
+      $('online').textContent = data.players.length;
+      $('tick').innerHTML = `<span class="${tickClass(data.lastTickMs)}">${data.lastTickMs.toFixed(1)}</span>
+        / ${data.avgTickMs.toFixed(1)} ms`;
+      $('tick-max').innerHTML = `<span class="${tickClass(data.maxTickMs)}">${data.maxTickMs.toFixed(1)} ms</span>`;
+      $('heap').textContent = `${data.heapUsedMb} / ${data.heapMaxMb} MB`;
+      lastPlayers = data.players;
+      renderPlayers(data.players);
+      renderDetail();
+      renderControls(data);
+      if (wasOffline) loadBans();
+    } catch (e) {
+      lastStatus = null;
+      $('status-dot').className = 'dot offline';
+      $('status-text').textContent = 'Server offline (waiting for it to come back)';
+    }
+  }
+
+  $('players').addEventListener('click', (e) => {
+    const row = e.target.closest('tr[data-name]');
+    if (!row) return;
+    selected = row.dataset.name;
+    renderPlayers(lastPlayers);
+    renderDetail();
+  });
+
+  $('bans').addEventListener('click', async (e) => {
+    const name = e.target.dataset.unban;
+    if (!name) return;
+    const result = await action({ type: 'unban', player: name });
+    if (result.ok) loadBans();
+  });
+
+  $('broadcast-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const result = await action({ type: 'broadcast', text: $('broadcast-text').value });
+    if (result.ok) $('broadcast-text').value = '';
+  });
+
+  $('maintenance-toggle').addEventListener('click', () => {
+    if (lastStatus) action({ type: 'maintenance', enabled: !lastStatus.maintenance });
+  });
+
+  $('xp-rate').addEventListener('input', () => { xpRateTouched = true; });
+  $('xp-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const result = await action({ type: 'xpRate', rate: parseFloat($('xp-rate').value) });
+    if (result.ok) xpRateTouched = false;
+  });
+
+  $('schedule-form').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const mode = $('schedule-mode');
+    const label = mode.options[mode.selectedIndex].text;
+    const seconds = parseInt($('schedule-seconds').value, 10) || 0;
+    if (confirm(`${label} in ${seconds} seconds? Everyone will be logged out.`)) {
+      action({ type: 'schedule', mode: mode.value, seconds });
+    }
+  });
+
+  $('schedule-cancel').addEventListener('click', () => action({ type: 'cancelSchedule' }));
+
+  $('ban-form').addEventListener('submit', (e) => {
+    e.preventDefault();
+    ban($('ban-name').value.trim(), $('ban-days').value);
+  });
+
+  $('ban-selected').addEventListener('click', () => {
+    const days = prompt(`Ban ${selected} for how many days? Leave empty for permanent.`, '1');
+    if (days === null) return;
+    ban(selected, days.trim());
+  });
+
+  $('give-form').addEventListener('submit', (e) => {
+    e.preventDefault();
+    action({
+      type: 'give',
+      player: selected,
+      item: $('give-item').value,
+      count: parseInt($('give-count').value, 10) || 1,
+    });
+  });
+
+  $('tele-form').addEventListener('submit', (e) => {
+    e.preventDefault();
+    action({
+      type: 'teleport',
+      player: selected,
+      x: parseInt($('tele-x').value, 10),
+      z: parseInt($('tele-z').value, 10),
+      level: parseInt($('tele-level').value, 10) || 0,
+    });
+  });
+
+  $('kick').addEventListener('click', () => {
+    if (selected && confirm(`Kick ${selected}?`)) action({ type: 'kick', player: selected });
+  });
+
+  poll();
+  setInterval(poll, 1000);
+</script>
+</body>
+</html>

@@ -29,6 +29,7 @@ import org.rsmod.events.EventBus
 import org.rsmod.game.GameUpdate
 import org.rsmod.game.GameUpdate.Companion.isCountdown
 import org.rsmod.game.GameUpdate.Companion.isUpdating
+import org.rsmod.game.LoginRestrictions
 import org.rsmod.game.entity.Player
 import org.rsmod.game.entity.player.SessionStateEvent
 import org.rsmod.map.CoordGrid
@@ -38,6 +39,7 @@ class AccountLoadResponseHook(
     private val config: RealmConfig,
     private val loginTimingLogs: Boolean,
     private val update: GameUpdate,
+    private val loginRestrictions: LoginRestrictions,
     private val eventBus: EventBus,
     private val accountRegistry: AccountRegistry,
     private val playerRegistry: PlayerRegistry,
@@ -412,6 +414,17 @@ class AccountLoadResponseHook(
 
         if (updateState.isCountdown() && updateState.current <= UPDATE_TIMER_REJECT_BUFFER) {
             writeErrorResponse(LoginResponse.UpdateInProgress)
+            return
+        }
+
+        if (loginRestrictions.maintenance && !player.modLevel.isAtLeast(Rights.MOD)) {
+            writeErrorResponse(LoginResponse.UpdateInProgress)
+            return
+        }
+
+        val bannedUntil = loadResponse.account.characterData.bannedUntil
+        if (bannedUntil != null && bannedUntil.isAfter(LocalDateTime.now())) {
+            writeErrorResponse(LoginResponse.Banned)
             return
         }
 
