@@ -1,0 +1,57 @@
+[[interface]]
+name = "interface.welcome_terms"
+width = 512
+height = 334
+on_load = ["clientscript.welcome_terms_init", "component.welcome_terms:frame"]
+
+[[component]]
+name = "root"
+type = "layer"
+x_mode = 1
+y_mode = 1
+width = 440
+height = 280
+
+[[component]]
+name = "frame"
+type = "layer"
+parent = "root"
+width = 440
+height = 280
+no_click_through = true
+
+[[component]]
+name = "body"
+type = "text"
+parent = "root"
+x = 30
+y = 50
+width = 380
+height = 110
+text = "By accepting, you acknowledge that this project is a work in progress. Items, progress, and entire accounts may be lost or reset at any time"
+font = "bold"
+h_align = "center"
+v_align = "center"
+line_height = 16
+text_shadow = true
+color = "#FFFFFF"
+
+[[component]]
+name = "checkbox"
+type = "layer"
+parent = "root"
+x = 90
+y = 180
+width = 260
+height = 20
+options = ["Toggle"]
+
+[[component]]
+name = "accept"
+type = "layer"
+parent = "root"
+x = 150
+y = 222
+width = 140
+height = 30
+options = ["Accept"]

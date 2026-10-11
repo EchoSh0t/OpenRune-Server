@@ -1,0 +1,21 @@
+[clientscript,welcome_terms_draw](int $ticked)
+def_component $checkbox = welcome_terms:checkbox;
+def_component $accept = welcome_terms:accept;
+def_graphic $tick = "checkbox,1";
+if ($ticked = 1) {
+    $tick = "checkbox,2";
+}
+cc_deleteall($checkbox);
+cc_create($checkbox, ^iftype_graphic, 0);
+cc_setposition(0, 0, ^setpos_abs_left, ^setpos_abs_centre);
+cc_setsize(16, 16, ^setsize_abs, ^setsize_abs);
+cc_setgraphic($tick);
+cc_create($checkbox, ^iftype_text, 1);
+cc_setposition(22, 0, ^setpos_abs_left, ^setpos_abs_centre);
+cc_setsize(238, 16, ^setsize_abs, ^setsize_abs);
+cc_settextfont(p12_full);
+cc_settextalign(^settextalign_left, ^settextalign_centre, 0);
+cc_settextshadow(true);
+cc_setcolour(0xff981f);
+cc_settext("I understand the above statement");
+~button_setup(null, $accept, "Accept");

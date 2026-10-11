@@ -1,0 +1,2 @@
+[clientscript,welcome_terms_init](component $frame)
+~steelborder($frame, "projectRune - Welcome", 1);

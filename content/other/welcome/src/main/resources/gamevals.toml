@@ -1,0 +1,17 @@
+[gamevals.interface]
+welcome_terms = 1102
+
+[gamevals.clientscript]
+welcome_terms_init = 45600
+welcome_terms_draw = 45603
+
+[gamevals.queue]
+welcome_terms_open = 27
+
+[gamevals.varp]
+welcome_state = 64000
+welcome_session = 64001
+
+[gamevals.varbit]
+welcome_terms_accepted = 64000
+welcome_terms_ticked = 64001

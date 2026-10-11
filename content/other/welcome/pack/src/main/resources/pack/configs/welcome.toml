@@ -1,0 +1,21 @@
+[[varp]]
+id = "varp.welcome_state"
+scope = "Perm"
+transmit = "Never"
+
+[[varbit]]
+id = "varbit.welcome_terms_accepted"
+varp = "varp.welcome_state"
+startBit = 0
+endBit = 0
+
+[[varp]]
+id = "varp.welcome_session"
+scope = "Temp"
+transmit = "Never"
+
+[[varbit]]
+id = "varbit.welcome_terms_ticked"
+varp = "varp.welcome_session"
+startBit = 0
+endBit = 0
