@@ -1,0 +1,7 @@
+[gamevals.varp]
+agility_course = 64010
+agility_mark_minute = 64011
+agility_laps_draynor = 64012
+
+[gamevals.varbit]
+agility_course_stage = 64010

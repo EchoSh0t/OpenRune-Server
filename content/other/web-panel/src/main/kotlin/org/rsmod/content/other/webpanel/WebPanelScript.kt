@@ -87,7 +87,10 @@ constructor(
             processScheduledExit()
             snapshot.set(buildSnapshot())
         }
-        onPlayerLogin { player.globalXpRate = settings.globalXpRate }
+        onPlayerLogin {
+            player.xpRate = 1.0
+            player.globalXpRate = settings.globalXpRate
+        }
     }
 
     private fun loadSettings() {
@@ -231,9 +234,10 @@ constructor(
         settings.globalXpRate = rate
         settings.save()
         for (player in playerList) {
+            player.xpRate = 1.0
             player.globalXpRate = rate
         }
-        return ok("Global XP rate set to ${rate}x.")
+        return ok("XP rate set to ${rate}x.")
     }
 
     private fun schedule(mode: String?, seconds: Int): ActionResult {
