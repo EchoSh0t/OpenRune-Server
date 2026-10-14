@@ -2,7 +2,6 @@ package org.rsmod.content.skills.agility
 
 import dev.openrune.rscm.RSCM.asRSCM
 import dev.openrune.types.BasType
-import org.rsmod.api.player.hook.TeleportType
 import org.rsmod.api.player.protect.ProtectedAccess
 import org.rsmod.api.player.protect.forcedWalk
 import org.rsmod.api.player.stat.agilityLvl
@@ -10,9 +9,9 @@ import org.rsmod.api.player.vars.intVarBit
 import org.rsmod.game.entity.Player
 import org.rsmod.map.CoordGrid
 
-internal const val FACE_EAST = 1536
+internal const val FACE_SOUTH = 0
 
-private const val CYCLES_PER_TICK = 30
+private const val NO_ANIM = -1
 
 internal var Player.courseStage by intVarBit("varbit.agility_course_stage")
 
@@ -43,60 +42,28 @@ internal fun ProtectedAccess.agilityXp(xp: Double) {
     statAdvance("stat.agility", xp)
 }
 
-/**
- * Walks [start] to [end] ignoring collision, with the player's movement animations swapped for
- * [walkSeq]/[readySeq] so the client plays them as the normal walk cycle (tightropes, ledges).
- */
-internal suspend fun ProtectedAccess.balanceAcross(
-    start: CoordGrid,
-    end: CoordGrid,
-    walkSeq: String,
-    readySeq: String,
-    introSeq: String? = null,
-    outroSeq: String? = null,
-) {
-    if (coords != start) {
-        forcedWalk(start, crossTiles = coords.chebyshevDistance(start))
+/** Walks to [dest] ignoring collision, unless the player is already standing there. */
+internal suspend fun ProtectedAccess.stepTo(dest: CoordGrid) {
+    if (coords != dest) {
+        forcedWalk(dest, crossTiles = coords.chebyshevDistance(dest))
     }
+}
+
+/**
+ * Runs [block] with the player's stand/walk animations replaced, the way Jagex animates
+ * tightropes and ledges: the player walks normally while the client loops [walkSeq].
+ */
+internal suspend fun ProtectedAccess.withMoveAnims(
+    readySeq: String,
+    turnSeq: String,
+    walkSeq: String,
+    block: suspend ProtectedAccess.() -> Unit,
+) {
     val walk = walkSeq.asRSCM()
-    val ready = readySeq.asRSCM()
-    player.bas = BasType(-1, ready, ready, walk, walk, walk, walk, walk)
+    player.bas = BasType(-1, readySeq.asRSCM(), turnSeq.asRSCM(), walk, walk, walk, walk, NO_ANIM)
     try {
-        if (introSeq != null) {
-            anim(introSeq)
-            delay(1)
-        }
-        forcedWalk(end, crossTiles = start.chebyshevDistance(end))
-        if (outroSeq != null) {
-            anim(outroSeq)
-            delay(1)
-        }
+        block()
     } finally {
         player.bas = null
     }
 }
-
-internal suspend fun ProtectedAccess.climbTo(dest: CoordGrid, seq: String, ticks: Int = 2) {
-    anim(seq)
-    delay(ticks)
-    telejump(dest, TeleportType.Exempt)
-}
-
-internal suspend fun ProtectedAccess.leapTo(
-    dest: CoordGrid,
-    seq: String,
-    dir: Int,
-    ticks: Int = 1,
-    landSeq: String? = null,
-) {
-    anim(seq)
-    exactMove(coords, dest, delay1 = 15, delay2 = ticks * CYCLES_PER_TICK + 15, dir = dir)
-    delay(ticks + 1)
-    if (landSeq != null) {
-        anim(landSeq)
-        delay(1)
-    }
-}
-
-private fun CoordGrid.chebyshevDistance(other: CoordGrid): Int =
-    maxOf(kotlin.math.abs(x - other.x), kotlin.math.abs(z - other.z))

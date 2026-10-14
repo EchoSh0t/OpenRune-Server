@@ -7,15 +7,14 @@ import org.rsmod.api.player.protect.forcedWalk
 import org.rsmod.api.player.vars.intVarp
 import org.rsmod.api.repo.obj.ObjRepository
 import org.rsmod.api.script.onOpLoc1
-import org.rsmod.content.skills.agility.FACE_EAST
+import org.rsmod.content.skills.agility.FACE_SOUTH
 import org.rsmod.content.skills.agility.agilityXp
-import org.rsmod.content.skills.agility.balanceAcross
-import org.rsmod.content.skills.agility.climbTo
 import org.rsmod.content.skills.agility.lapComplete
-import org.rsmod.content.skills.agility.leapTo
 import org.rsmod.content.skills.agility.meetsLevel
 import org.rsmod.content.skills.agility.progressLap
 import org.rsmod.content.skills.agility.rollMarkOfGrace
+import org.rsmod.content.skills.agility.stepTo
+import org.rsmod.content.skills.agility.withMoveAnims
 import org.rsmod.game.entity.Player
 import org.rsmod.map.CoordGrid
 import org.rsmod.plugin.scripts.PluginScript
@@ -40,93 +39,122 @@ class DraynorRooftopCourse @Inject constructor(private val objRepo: ObjRepositor
         if (!meetsLevel(LEVEL)) {
             return
         }
-        climbTo(ROUGH_WALL_TOP, "seq.human_reachforladder")
+        delay(1)
+        anim("seq.human_reachforladder", delay = 15)
+        delay(2)
+        telejump(ROUGH_WALL_TOP, TeleportType.Exempt)
+        resetAnim()
         agilityXp(5.0)
         progressLap(0)
     }
 
     private suspend fun ProtectedAccess.firstTightrope() {
         arriveDelay()
-        balanceAcross(ROPE_1_START, ROPE_1_END, BALANCE_SEQ, BALANCE_READY_SEQ)
+        stepTo(ROPE_1_START)
+        withMoveAnims(BALANCE_READY, BALANCE_WALK, BALANCE_WALK) { stepTo(ROPE_1_END) }
+        forcedWalk(ROPE_1_EXIT, crossTiles = 1)
         agilityXp(8.0)
         progressLap(1)
     }
 
     private suspend fun ProtectedAccess.secondTightrope() {
         arriveDelay()
-        balanceAcross(ROPE_2_START, ROPE_2_END, BALANCE_SEQ, BALANCE_READY_SEQ)
+        stepTo(ROPE_2_START)
+        withMoveAnims(BALANCE_READY, BALANCE_WALK, BALANCE_WALK) { stepTo(ROPE_2_END) }
+        forcedWalk(ROPE_2_EXIT, crossTiles = 1)
         agilityXp(7.0)
         progressLap(2)
     }
 
     private suspend fun ProtectedAccess.narrowWall() {
         arriveDelay()
-        balanceAcross(
-            NARROW_WALL_START,
-            NARROW_WALL_END,
-            walkSeq = "seq.human_walk_sidestepl",
-            readySeq = "seq.human_ready_sidestepl",
-            introSeq = "seq.human_into_sidestepl",
-            outroSeq = "seq.human_outof_sidestepl",
-        )
-        forcedWalk(NARROW_WALL_EXIT, crossTiles = 1)
+        stepTo(NARROW_WALL_START)
+        withMoveAnims(SIDESTEP_READY, SIDESTEP_READY, SIDESTEP_WALK) {
+            anim("seq.human_into_sidestepl")
+            forcedWalk(NARROW_WALL_PATH, crossTiles = 4)
+        }
+        anim("seq.human_outof_sidestepl")
         agilityXp(7.0)
         progressLap(3)
     }
 
     private suspend fun ProtectedAccess.wall() {
         arriveDelay()
-        anim("seq.agility_shortcut_wall_jump")
+        stepTo(WALL_START)
         delay(1)
-        climbTo(WALL_TOP, "seq.agility_shortcut_wall_jump2", ticks = 1)
+        anim("seq.agility_shortcut_wall_jump", delay = 20)
+        exactMove(WALL_START, WALL_LEDGE, delay1 = 25, delay2 = 30, dir = FACE_SOUTH)
+        delay(1)
+        anim("seq.agility_shortcut_wall_jump2")
+        delay(1)
+        exactMove(WALL_LEDGE, WALL_TOP, delay1 = 17, delay2 = 26, dir = FACE_SOUTH)
+        delay(1)
+        resetAnim()
         agilityXp(10.0)
         progressLap(4)
     }
 
     private suspend fun ProtectedAccess.gap() {
         arriveDelay()
-        leapTo(
-            GAP_LANDING,
-            "seq.agility_shortcut_wall_jumpdown",
-            FACE_EAST,
-            landSeq = "seq.agility_shortcut_wall_jumpdown2",
-        )
+        stepTo(GAP_START)
+        delay(1)
+        jumpDown(GAP_LANDING)
+        delay(1)
+        resetAnim()
         agilityXp(4.0)
         progressLap(5)
     }
 
     private suspend fun ProtectedAccess.crate() {
         arriveDelay()
-        anim("seq.agility_shortcut_wall_jumpdown")
+        stepTo(CRATE_START)
         delay(1)
-        telejump(FINISH, TeleportType.Exempt)
-        anim("seq.agility_shortcut_wall_jumpdown2")
+        jumpDown(CRATE_MIDAIR)
+        delay(1)
+        resetAnim()
+        delay(1)
+        jumpDown(FINISH)
         agilityXp(79.0)
         progressLap(6)
         if (!lapComplete(OBSTACLES)) {
             return
         }
         player.laps += 1
-        mes("Your Draynor Rooftop lap count is: <col=ff0000>${player.laps}</col>.")
+        mes("Your Draynor Village Rooftop lap count is: <col=ff0000>${player.laps}</col>.")
         rollMarkOfGrace(objRepo, LEVEL, MARK_SPAWNS)
+    }
+
+    private suspend fun ProtectedAccess.jumpDown(dest: CoordGrid) {
+        anim("seq.agility_shortcut_wall_jumpdown", delay = 15)
+        delay(1)
+        telejump(dest, TeleportType.Exempt)
+        anim("seq.agility_shortcut_wall_jumpdown2")
     }
 
     private companion object {
         const val LEVEL = 1
         const val OBSTACLES = 7
-        const val BALANCE_SEQ = "seq.human_walk_logbalance"
-        const val BALANCE_READY_SEQ = "seq.human_walk_logbalance_ready"
+        const val BALANCE_READY = "seq.human_walk_logbalance_ready"
+        const val BALANCE_WALK = "seq.human_walk_logbalance"
+        const val SIDESTEP_READY = "seq.human_ready_sidestepl"
+        const val SIDESTEP_WALK = "seq.human_walk_sidestepl"
 
         val ROUGH_WALL_TOP = CoordGrid(3102, 3279, 3)
-        val ROPE_1_START = CoordGrid(3099, 3277, 3)
+        val ROPE_1_START = CoordGrid(3098, 3277, 3)
         val ROPE_1_END = CoordGrid(3090, 3277, 3)
+        val ROPE_1_EXIT = CoordGrid(3090, 3276, 3)
         val ROPE_2_START = CoordGrid(3092, 3276, 3)
         val ROPE_2_END = CoordGrid(3092, 3267, 3)
+        val ROPE_2_EXIT = CoordGrid(3092, 3266, 3)
         val NARROW_WALL_START = CoordGrid(3089, 3265, 3)
-        val NARROW_WALL_END = CoordGrid(3089, 3262, 3)
-        val NARROW_WALL_EXIT = CoordGrid(3088, 3261, 3)
+        val NARROW_WALL_PATH = listOf(CoordGrid(3089, 3262, 3), CoordGrid(3088, 3261, 3))
+        val WALL_START = CoordGrid(3088, 3257, 3)
+        val WALL_LEDGE = CoordGrid(3088, 3256, 3)
         val WALL_TOP = CoordGrid(3088, 3255, 3)
+        val GAP_START = CoordGrid(3094, 3255, 3)
         val GAP_LANDING = CoordGrid(3096, 3256, 3)
+        val CRATE_START = CoordGrid(3101, 3261, 3)
+        val CRATE_MIDAIR = CoordGrid(3102, 3261, 1)
         val FINISH = CoordGrid(3103, 3261, 0)
 
         val MARK_SPAWNS =
