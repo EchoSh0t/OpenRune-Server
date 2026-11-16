@@ -16,6 +16,9 @@ touching.
 - Typical content loop: edit Kotlin in `content/` → `gradlew run` and test. If you
   touched a `-pack` module's resources or a `gamevals.toml`, rebuild the cache
   (`buildCache`) before running.
+- `gradlew lintGamevals` checks that every quoted gameval symbol in `content/`, `api/` and
+ `server/` resolves, with "did you mean" hints — seconds, versus finding out at boot or when
+ the handler first runs. `-PwarnOnly=true` reports without failing.
 
 ## Modules
 
@@ -27,6 +30,7 @@ touching.
 | `server/` | Runtime: `app` (entry), `install`, `logging`, `services` (DB/central), `shared` (plugin loader) |
 | `or-cache/` | Cache builder (main: `dev.openrune.CacheToolsKt`); merges gamevals from content `-pack` modules |
 | `tools/` | `osrs-mcp`, `wiki-dumping`, progress generator |
+| `website/` | Public Next.js site (news, hiscores, account registration) and the staff admin area at `/admin`; talks to `content/other/website-api` and the admin API in `content/other/web-panel`. See `website/README.md` |
 
 ## Writing content plugins
 

@@ -6,16 +6,20 @@ import dev.openrune.rscm.RSCM
 import dev.openrune.rscm.RSCM.asRSCM
 import dev.openrune.rscm.RSCMType
 import dev.openrune.types.ItemServerType
+import dev.or2.central.account.Rights
 import jakarta.inject.Inject
+import jakarta.inject.Provider
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.math.ceil
+import org.rsmod.api.db.DatabaseConfig
 import org.rsmod.api.db.jdbc.GameDatabase
 import org.rsmod.api.game.process.GameLifecycle
 import org.rsmod.api.invtx.invAdd
+import org.rsmod.api.net.central.OpenRuneCentralWorldLink
 import org.rsmod.api.player.forceDisconnect
 import org.rsmod.api.player.hook.TeleportType
 import org.rsmod.api.player.output.ChatType
@@ -26,6 +30,11 @@ import org.rsmod.api.player.stat.stat
 import org.rsmod.api.player.stat.statBase
 import org.rsmod.api.script.onEvent
 import org.rsmod.api.script.onPlayerLogin
+import org.rsmod.api.server.config.ServerConfig
+import org.rsmod.api.totp.Totp
+import org.rsmod.api.totp.laravel.TwoFactorSecretResolver
+import org.rsmod.api.totp.useGeneratedSecret
+import org.rsmod.api.totp.useSecret
 import org.rsmod.api.utils.format.formatAmount
 import org.rsmod.api.utils.system.SafeServiceExit
 import org.rsmod.game.GameUpdate
@@ -45,6 +54,11 @@ constructor(
     private val protectedAccess: ProtectedAccessLauncher,
     private val update: GameUpdate,
     private val loginRestrictions: LoginRestrictions,
+    private val databaseConfig: Provider<DatabaseConfig>,
+    private val centralLink: OpenRuneCentralWorldLink,
+    private val totp: Totp,
+    private val secretResolver: TwoFactorSecretResolver,
+    private val serverConfig: ServerConfig,
     database: GameDatabase,
 ) : PluginScript() {
     private val logger = InlineLogger()
@@ -71,6 +85,23 @@ constructor(
         }
     }
 
+    private val lookupSkills: List<Pair<Int, String>> by lazy {
+        ServerCacheManager.getStats().keys.sorted().map { id ->
+            val name = RSCM.getReverseMapping(RSCMType.STAT, id).removePrefix("stat.")
+            id to name.replaceFirstChar(Char::uppercaseChar)
+        }
+    }
+
+    private val staffTotp =
+        object : StaffTotp {
+            override fun newSecret(): String = totp.useGeneratedSecret { String(it) }
+
+            override fun verify(storedSecret: String, code: String): Boolean {
+                val secret = secretResolver.resolveStoredSecret(storedSecret) ?: return false
+                return useSecret(secret) { totp.verifyCode(it, code) }
+            }
+        }
+
     override fun ScriptContext.startup() {
         onEvent<GameLifecycle.Startup> {
             loadSettings()
@@ -96,6 +127,7 @@ constructor(
     private fun loadSettings() {
         try {
             settings.load()
+            settings.save()
         } catch (e: Exception) {
             logger.warn(e) { "Could not read web panel settings; using defaults." }
         }
@@ -103,28 +135,71 @@ constructor(
     }
 
     private fun startServer() {
-        val http = PanelHttpServer(PORT, snapshot::get, ::queueAction)
+        val audit = PanelAudit(DATA_DIR.resolve("web-panel-audit.log"))
+        val database = PanelDatabase(databaseConfig::get)
+        val staffDatabase = PanelStaffDatabase(databaseConfig::get)
+        try {
+            staffDatabase.ensureSchema()
+        } catch (e: Exception) {
+            logger.warn(e) { "Could not create the website tables; notes, reports and IP history won't work." }
+        }
+        val auth = StaffAuth(database, centralLink::passwordHasher, staffTotp, serverConfig.name)
+        val lookup = { name: String, staff: StaffSession -> lookupPlayer(database, staffDatabase, name, staff) }
+        val http =
+            PanelHttpServer(PORT, settings, auth, audit, snapshot::get, lookup, ::queueAction, staffDatabase)
         try {
             http.start()
             server = http
-            logger.info { "Web panel running at http://127.0.0.1:$PORT" }
+            logger.info {
+                "Admin API running at http://${settings.bindAddress}:$PORT " +
+                    "(api_key is in .data/web-panel.properties)"
+            }
         } catch (e: Exception) {
-            logger.warn(e) { "Web panel could not start on port $PORT." }
+            logger.warn(e) { "Admin API could not start on port $PORT." }
         }
     }
 
-    private fun queueAction(request: ActionRequest): CompletableFuture<ActionResult> {
+    private fun lookupPlayer(
+        database: PanelDatabase,
+        staffDatabase: PanelStaffDatabase,
+        name: String,
+        staff: StaffSession,
+    ): PlayerLookupView? {
+        val found = database.lookup(name, lookupSkills, ::itemName) ?: return null
+        val history =
+            try {
+                staffDatabase.history(found.characterId, includeIps = staff.isAdmin)
+            } catch (e: Exception) {
+                logger.warn(e) { "Could not load staff history for ${found.name}" }
+                null
+            }
+        val view = found.copy(history = history)
+        val live = snapshot.get()?.players?.firstOrNull { it.name.equals(view.name, ignoreCase = true) }
+        return if (live == null) {
+            view
+        } else {
+            view.copy(online = true, x = live.x, z = live.z, level = live.level)
+        }
+    }
+
+    private fun itemName(obj: String): String {
+        val id = obj.toIntOrNull() ?: runCatching { obj.asRSCM(RSCMType.OBJ) }.getOrNull()
+        val name = id?.let { ServerCacheManager.getItem(it)?.name }
+        return name?.takeIf { it.isNotBlank() && it != "null" } ?: obj.removePrefix("obj.")
+    }
+
+    private fun queueAction(request: ActionRequest, staff: StaffSession): CompletableFuture<ActionResult> {
         val future = CompletableFuture<ActionResult>()
-        pendingActions += PendingAction(request, future)
+        pendingActions += PendingAction(request, staff, future)
         return future
     }
 
     private fun processPendingActions() {
         while (true) {
-            val (request, future) = pendingActions.poll() ?: return
+            val (request, staff, future) = pendingActions.poll() ?: return
             val result =
                 try {
-                    perform(request)
+                    perform(request, staff)
                 } catch (e: Exception) {
                     logger.warn(e) { "Web panel action failed: $request" }
                     ActionResult(ok = false, message = e.message ?: e.javaClass.simpleName)
@@ -133,14 +208,16 @@ constructor(
         }
     }
 
-    private fun perform(request: ActionRequest): ActionResult =
+    private fun perform(request: ActionRequest, staff: StaffSession): ActionResult =
         when (request.type) {
             "broadcast" -> broadcast(request.text)
-            "kick" -> withPlayer(request) { kick(it) }
+            "kick" -> withPlayer(request) { kick(it, staff, request.reason) }
             "give" -> withPlayer(request) { give(it, request.item, request.count ?: 1) }
             "teleport" -> withPlayer(request) { teleport(it, request) }
-            "ban" -> ban(request.player, request.days)
-            "unban" -> unban(request.player)
+            "ban" -> ban(request, staff)
+            "unban" -> unban(request.player, staff)
+            "mute" -> mute(request, staff)
+            "unmute" -> unmute(request.player, staff)
             "bans" -> ActionResult(ok = true, message = "", data = bans.list())
             "maintenance" -> setMaintenance(request.enabled ?: false)
             "xpRate" -> setGlobalXpRate(request.rate)
@@ -162,7 +239,11 @@ constructor(
         return ok("Broadcast sent to $count player(s).")
     }
 
-    private fun kick(player: Player): ActionResult {
+    private fun kick(player: Player, staff: StaffSession, reason: String?): ActionResult {
+        if (!staff.outranks(player.modLevel)) {
+            return fail("You can't kick ${player.displayName}: they have the same or higher rank.")
+        }
+        bans.recordKick(player.characterId, reasonOrDefault(reason), staff.name)
         player.forceDisconnect()
         return ok("Kicked ${player.displayName}.")
     }
@@ -197,27 +278,65 @@ constructor(
         return ok("Teleported ${player.displayName} to $dest.")
     }
 
-    private fun ban(name: String?, days: Int?): ActionResult {
-        val target = name?.trim().orEmpty()
-        if (target.isEmpty()) {
-            return fail("Enter a player name to ban.")
-        }
-        if (days != null && days <= 0) {
-            return fail("Ban length must be at least 1 day.")
-        }
-        bans.ban(target, days) ?: return fail("No character named '$target'.")
-        findOnline(target)?.forceDisconnect()
-        val length = if (days == null) "permanently" else "for $days day(s)"
-        return ok("Banned $target $length.")
+    private fun ban(request: ActionRequest, staff: StaffSession): ActionResult {
+        val target = punishable(request, staff, "ban") { return it }
+        bans.ban(target, request.days, request.reason!!.trim(), staff.name)
+        findOnline(target.name)?.forceDisconnect()
+        return ok("Banned ${target.name} ${length(request.days)}.")
     }
 
-    private fun unban(name: String?): ActionResult {
-        val target = name?.trim().orEmpty()
-        if (!bans.unban(target)) {
-            return fail("No character named '$target'.")
-        }
-        return ok("Unbanned $target.")
+    private fun unban(name: String?, staff: StaffSession): ActionResult {
+        val target = bans.target(name.orEmpty()) ?: return fail("No character named '${name.orEmpty().trim()}'.")
+        bans.unban(target, staff.name)
+        return ok("Unbanned ${target.name}.")
     }
+
+    private fun mute(request: ActionRequest, staff: StaffSession): ActionResult {
+        val target = punishable(request, staff, "mute") { return it }
+        val until = bans.mute(target, request.days, request.reason!!.trim(), staff.name)
+        findOnline(target.name)?.let { player ->
+            player.mutedUntil = until
+            player.mes("You have been muted.")
+        }
+        return ok("Muted ${target.name} ${length(request.days)}.")
+    }
+
+    private fun unmute(name: String?, staff: StaffSession): ActionResult {
+        val target = bans.target(name.orEmpty()) ?: return fail("No character named '${name.orEmpty().trim()}'.")
+        bans.unmute(target, staff.name)
+        findOnline(target.name)?.let { player ->
+            player.mutedUntil = null
+            player.mes("You are no longer muted.")
+        }
+        return ok("Unmuted ${target.name}.")
+    }
+
+    private inline fun punishable(
+        request: ActionRequest,
+        staff: StaffSession,
+        verb: String,
+        onError: (ActionResult) -> Nothing,
+    ): PanelBans.Target {
+        val name = request.player?.trim().orEmpty()
+        if (name.isEmpty()) {
+            onError(fail("Enter a player name to $verb."))
+        }
+        if (request.days != null && request.days <= 0) {
+            onError(fail("Length must be at least 1 day."))
+        }
+        if (request.reason.isNullOrBlank()) {
+            onError(fail("Give a reason so other staff know why."))
+        }
+        val target = bans.target(name) ?: onError(fail("No character named '$name'."))
+        if (!staff.outranks(target.rights)) {
+            onError(fail("You can't $verb ${target.name}: they have the same or higher rank."))
+        }
+        return target
+    }
+
+    private fun length(days: Int?): String = if (days == null) "permanently" else "for $days day(s)"
+
+    private fun reasonOrDefault(reason: String?): String = reason?.trim()?.ifEmpty { null } ?: "No reason given"
 
     private fun setMaintenance(enabled: Boolean): ActionResult {
         loginRestrictions.maintenance = enabled
@@ -352,6 +471,8 @@ constructor(
         )
     }
 
+    private fun StaffSession.outranks(target: Rights): Boolean = rights.isHigherThan(target)
+
     private fun Long.toMillis(): Double = this / NANOS_PER_MILLI
 
     private fun ok(message: String) = ActionResult(ok = true, message = message)
@@ -369,6 +490,7 @@ constructor(
 
     private data class PendingAction(
         val request: ActionRequest,
+        val staff: StaffSession,
         val future: CompletableFuture<ActionResult>,
     )
 

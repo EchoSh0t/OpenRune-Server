@@ -293,16 +293,39 @@ constructor(
         worldType: WorldType,
     ): AccountLoadResponse =
         try {
-            val metadataList = createMetadataList(request.accountName, request.hashedPassword())
-            AccountLoadResponse.Ok.NewAccount(
-                request.auth,
-                metadataList.accountData,
-                metadataList,
-                worldType,
-            )
+            val metadataList =
+                if (serverConfig.accounts.autoRegister) {
+                    createMetadataList(request.accountName, request.hashedPassword())
+                } else {
+                    createCharacterForExistingAccount(request.accountName)
+                }
+            if (metadataList == null) {
+                AccountLoadResponse.Err.AccountNotFound
+            } else {
+                newAccountResponse(request, metadataList, worldType)
+            }
         } catch (e: Exception) {
             AccountLoadResponse.Err.Exception(e)
         }
+
+    private fun newAccountResponse(
+        request: AccountLoadRequest.SearchOrCreateWithPassword,
+        metadataList: CharacterMetadataList,
+        worldType: WorldType,
+    ): AccountLoadResponse =
+        AccountLoadResponse.Ok.NewAccount(
+            request.auth,
+            metadataList.accountData,
+            metadataList,
+            worldType,
+        )
+
+    private fun DatabaseConnection.createCharacterForExistingAccount(
+        accountName: String,
+    ): CharacterMetadataList? {
+        val accountId = repository.selectAccountId(this, accountName) ?: return null
+        return createCharacter(accountName, accountId)
+    }
 
     private fun DatabaseConnection.createMetadataList(
         accountName: String,
@@ -312,7 +335,13 @@ constructor(
         if (accountId == null) {
             throw IllegalStateException("Could not insert or select account id for: '$accountName'")
         }
+        return createCharacter(accountName, accountId)
+    }
 
+    private fun DatabaseConnection.createCharacter(
+        accountName: String,
+        accountId: Int,
+    ): CharacterMetadataList {
         val characterId = repository.insertAndSelectCharacterId(this, accountId)
         if (characterId == null) {
             throw IllegalStateException("Could not insert character for: '$accountName' ($accountId)")

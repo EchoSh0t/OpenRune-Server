@@ -1,2 +1,2 @@
 [clientscript,welcome_terms_init](component $frame)
-~steelborder($frame, "projectRune - Welcome", 1);
+~steelborder($frame, "Elysium - Welcome", 1);

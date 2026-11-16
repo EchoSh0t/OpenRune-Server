@@ -68,6 +68,12 @@ public data class QuestRequirementsYaml(
 )
 
 @JsonIgnoreProperties(ignoreUnknown = true)
+public data class AccountsConfig(
+    /** When false, accounts must already exist (e.g. created on the website) before logging in. */
+    @JsonProperty("auto-register") val autoRegister: Boolean = true,
+)
+
+@JsonIgnoreProperties(ignoreUnknown = true)
 public data class ServerConfig(
     val name: String,
     @JsonProperty("game-port") val gamePort: Int,
@@ -77,6 +83,7 @@ public data class ServerConfig(
     /** Every mode this world serves, first one being its default. Empty means `main` only. */
     @JsonProperty("world-types") val worldTypes: List<String> = emptyList(),
     val gameplay: GameplayConfig = GameplayConfig(),
+    val accounts: AccountsConfig = AccountsConfig(),
     val database: GameDatabaseYaml? = null,
     val central: OpenRuneCentralGameConfig? = null,
     @JsonProperty("login-timing-logs") val loginTimingLogs: Boolean = false,

@@ -73,6 +73,22 @@ tasks {
         dependsOn("classes")
     }
 
+    register<JavaExec>("lintGamevals") {
+        group = "verification"
+        description =
+            "Fails if any gameval symbol quoted in content/api/server sources does not resolve " +
+                "(-PwarnOnly=true to report without failing)"
+
+        classpath = sourceSets["main"].output + configurations["compileClasspath"]
+        mainClass.set("dev.openrune.gamevals.GamevalLintKt")
+        workingDir = rootProject.projectDir
+        args = listOfNotNull(
+            rootProject.projectDir.absolutePath,
+            "--warn-only".takeIf { project.findProperty("warnOnly")?.toString() == "true" },
+        )
+        dependsOn("classes")
+    }
+
 
 
 }

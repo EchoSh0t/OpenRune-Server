@@ -34,6 +34,7 @@ public class CharacterAccountApplier @Inject constructor() :
         player.previousDisplayName = c.previousDisplayName ?: ""
         player.displayNameChangedAtMillis = c.displayNameChangedAtMillis
         player.discordId = d.discordId
+        player.mutedUntil = c.mutedUntil
         player.coords = CoordGrid(c.coordX, c.coordZ, c.coordLevel)
         player.createdAt = c.createdAt
         player.runEnergy = c.runEnergy

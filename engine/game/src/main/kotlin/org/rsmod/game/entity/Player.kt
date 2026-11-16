@@ -190,6 +190,10 @@ public class Player(
     public var previousDisplayName: String = ""
     public var displayNameChangedAtMillis: Long? = null
     public var discordId: Long? = null
+    public var mutedUntil: LocalDateTime? = null
+    public val isMuted: Boolean
+        get() = mutedUntil?.isAfter(LocalDateTime.now()) == true
+
     public var createdAt: LocalDateTime? = null
     public var followCoord: CoordGrid = CoordGrid.NULL
     public var buildArea: CoordGrid = CoordGrid.NULL

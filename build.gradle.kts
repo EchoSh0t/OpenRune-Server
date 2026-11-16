@@ -47,6 +47,13 @@ tasks.register("runMcp") {
     dependsOn(":tools:osrs-mcp:runMcp")
 }
 
+tasks.register("lintGamevals") {
+    group = "verification"
+    description = "Alias for :or-cache:lintGamevals (checks every quoted gameval symbol resolves)."
+
+    dependsOn(":or-cache:lintGamevals")
+}
+
 tasks.register<JavaExec>("install") {
     group = "installation"
     description = "Runs the complete RS Mod server installation task."

@@ -31,6 +31,12 @@ gameplay:
     virtual-completions: []
     virtual-lines: []
 
+accounts:
+  # true: the first login with an unknown username creates the account (handy for local dev).
+  # false: accounts must be registered on the website first (see website/README.md); logins with
+  # unknown usernames get "invalid username or password".
+  auto-register: true
+
 central:
   same-instance: true
   host: "127.0.0.1"

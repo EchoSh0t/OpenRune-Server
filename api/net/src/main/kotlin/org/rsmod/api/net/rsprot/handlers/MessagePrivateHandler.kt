@@ -28,6 +28,10 @@ constructor(
         val senderDisplayName = player.displayName.ifBlank { player.username }
         val senderCrown = player.modLevel.clientCode
 
+        if (player.isMuted) {
+            player.writeSocialMessage(MUTED_MESSAGE)
+            return
+        }
         if (characterId <= 0) {
             player.writeSocialMessage("Private messaging is not available right now.")
             return
