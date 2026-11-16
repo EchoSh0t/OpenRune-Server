@@ -18,3 +18,59 @@ transmit = "Never"
 id = "varp.agility_laps_draynor"
 scope = "Perm"
 transmit = "Never"
+
+[[varp]]
+id = "varp.agility_laps_gnome"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.agility_laps_kharid"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.agility_laps_varrock"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.agility_laps_canifis"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.agility_laps_falador"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.agility_laps_seers"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.agility_laps_pollnivneach"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.agility_laps_rellekka"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.agility_laps_ardougne"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.agility_settings"
+scope = "Perm"
+transmit = "Never"
+
+[[varbit]]
+id = "varbit.agility_lap_messages_off"
+varp = "varp.agility_settings"
+startBit = 0
+endBit = 0

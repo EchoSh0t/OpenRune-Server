@@ -2,6 +2,26 @@
 agility_course = 64010
 agility_mark_minute = 64011
 agility_laps_draynor = 64012
+agility_laps_gnome = 64013
+agility_settings = 64014
+agility_laps_kharid = 64015
+agility_laps_varrock = 64016
+agility_laps_canifis = 64017
+agility_laps_falador = 64018
+agility_laps_seers = 64019
+agility_laps_pollnivneach = 64020
+agility_laps_rellekka = 64021
+agility_laps_ardougne = 64022
 
 [gamevals.varbit]
 agility_course_stage = 64010
+agility_lap_messages_off = 64011
+
+[gamevals.currency]
+mark_of_grace = 65532
+
+[gamevals.dbrow]
+shop_currency_mark_of_grace = 63502
+
+[gamevals.inv]
+agility_grace_shop = 1103
